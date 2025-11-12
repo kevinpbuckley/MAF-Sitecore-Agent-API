@@ -1,0 +1,6026 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Agent API",
+    "description": "\nThe Agent API allows AI agents to take direct action in Sitecore through secure REST endpoints. It supports common digital experience tasks such as creating pages, adding components, and updating content.\n\nAs part of Sitecore's [*interoperability*](https://doc.sitecore.com/xmc/en/users/xm-cloud/integrating-sitecore-with-agentic-platforms.html) approach, the Agent API allows agentic platforms and other connected systems to interact directly with Sitecore. When an AI agent receives a natural language request, it can call the appropriate Agent API endpoints to complete the task. For example, a request to create a new landing page might trigger an endpoint in Sitecore that automatically builds the page. If the AI agent performs an unintended action, you can use the job ID to revert it. Each operation is tracked to ensure safe rollback when needed.\n\nAll Agent API actions follow the built-in security and approval rules in Sitecore, keeping work safe, traceable, and auditable.\n\nIn addition to AI agent-driven workflows, developers can also use the REST API directly to interact with the following objects:\n\n- **Sites** - retrieve and manage sites and their pages.\n- **Pages** - create and manage pages and components.\n- **Content** - create and organize content items.\n- **Components** - retrieve and manage components and datasources.\n- **Assets** - upload and manage digital assets.\n- **Environments** - retrieve environment and language details.\n- **Personalization** - manage personalized content variants.\n- **Jobs** - view or revert job operations.\n\n\nNote the following:\n\n- To use this REST API, you authenticate your API requests.\n- All API requests are made in your production environment.\n\nThe Agent API also powers the Marketer MCP, which uses these endpoints to perform agentic operations in Sitecore. Read more about the [Marketer MCP](https://doc.sitecore.com/xmc/en/users/xm-cloud/marketer-mcp.html/).\n\n# Authorization\n To authorize your requests, use environment automation client credentials and generate a JSON Web Token (JWT). You can also register an OAuth app if your integration requires the OAuth 2.0 authorization code flow.\n\nNote: To create client credentials, you must be an [Organization Admin](https://doc.sitecore.com/portal/en/developers/sitecore-cloud-portal/roles.html) or Organization Owner.\n\n## Create an automation client\n 1. In the Sitecore Cloud Portal, open XM Cloud Deploy.\n 2. Click **Credentials** > **Environment** > **Create credentials** > **Automation**.\n 3. Fill out the automation client details, then click **Create**.\n 4. Copy the client ID and the client secret because you won't be able to view them again in XM Cloud Deploy. You'll use them to request a JWT.\n\n## Register an OAuth app for the Agent API \nThe Agent API uses the OAuth 2.0 authorization code flow to securely authenticate requests from external applications.\n\n Each application must have an OAuth app registration, which identifies the app and defines the parts of the Sitecore platform it can access. \n\n If you plan to register an OAuth app that uses the Agent API, you must submit a registration request to Sitecore Support and request the following scopes:\n - `xmcloud.cm:admin` \n - `personalize.exp:mng` \n - `personalize.tmpl:r` \n - `personalize.pos:mng`   \n## Request a JWT\n\nRun the following cURL command to request a JWT. Replace the placeholder values with your client ID and client secret.\n\n```curl\n  curl -X POST 'https://auth.sitecorecloud.io/oauth/token' \\\n  --header 'Content-Type: application/x-www-form-urlencoded' \\ \n  --data-urlencode 'client_id={YOUR_CLIENT_ID}' \\\n  --data-urlencode 'client_secret={YOUR_CLIENT_SECRET}' \\\n  --data-urlencode 'grant_type=client_credentials' \\\n  --data-urlencode 'audience=https://api.sitecorecloud.io'\n```\n\nIn the response, the `access_token` key contains the JWT:\n\n```json\n  {\n    \"access_token\": \"{YOUR_JWT}\",\n    \"scope\": \"xmcloud.cm:admin\",\n    \"expires_in\": 86400,\n    \"token_type\": \"Bearer\"\n  }\n```\n\nThe JWT expires in 24 hours. If your requests unexpectedly return a response with status `401 Unauthorized`, request a new JWT by repeating this `POST` request.\n\nWe recommend that you cache the JWT for 24 hours to avoid repeating this `POST` request while the JWT is still valid.\n\n## Include the JWT in the request header\n\nYou can now start making REST API requests. You must include the JWT in the request header of every request. For example:\n```curl\n  curl -X GET '{YOUR_BASE_URL}/...' \\\n  -H 'Authorization: Bearer {YOUR_JWT}' \\\n  -H 'Accept: application/json'\n```\n",
+    "version": "v1.0",
+    "contact": {
+      "name": "Sitecore Corporation A/S"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    "x-metadata": {
+      "product": "AI capabilities"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://edge-platform.sitecorecloud.io/stream/ai-agent-api",
+      "description": "Production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Sites",
+      "description": "The Sites API lets you retrieve all sites, retrieve details about a specific site, list pages of a site, and retrieve a site ID associated with an item ID."
+    },
+    {
+      "name": "Pages",
+      "description": "The Pages API lets you create new pages, add new language versions or components to a page, search for pages on a site, set the component datasource on a page, retrieve page components, paths, HTML, preview URL, screenshots, templates, details, and allowed components."
+    },
+    {
+      "name": "Content",
+      "description": "The Content API lets you create, retrieve, update, delete and organize structured content items, and retrieve insert options."
+    },
+    {
+      "name": "Components",
+      "description": "The Components API lets you retrieve components, get the details of a specific component, search datasources in a component, and create a component datasource."
+    },
+    {
+      "name": "Assets",
+      "description": "The Assets API lets you upload, search assets, retrieve asset details, and update asset metadata."
+    },
+    {
+      "name": "Environments",
+      "description": "The Environments API lets you retrieve available languages in your environment. "
+    },
+    {
+      "name": "Personalization",
+      "description": "The Personalization API lets you create personalized variants for different audiences by showing targeted content based on certain conditions."
+    },
+    {
+      "name": "Jobs",
+      "description": "The Jobs API lets you retrieve all details and operations of a specific job or revert a job to undo changes made during an operation."
+    }
+  ],
+  "paths": {
+    "/api/v1/sites": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "summary": "List sites",
+        "description": "Retrieves a list of available sites with their basic information including name, display name, and URL.",
+        "operationId": "sites-get_sites_list",
+        "parameters": [
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListSitesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "sites": []
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sites/{siteId}": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "summary": "Retrieve the site details",
+        "description": "Retrieves the details of a specific site including its  ID, name, and root path.",
+        "operationId": "sites-get_site_details",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Siteid"
+            },
+            "description": "The unique identifier of the site.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteInformationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sites/{siteName}/pages": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "summary": "List pages of a site",
+        "description": "Retrieves a list of pages for a specific site, including each page's ID and path. You can optionally filter the pages by language.",
+        "operationId": "sites-get_all_pages_by_site",
+        "parameters": [
+          {
+            "name": "siteName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sitename"
+            },
+            "description": "The unique name of the site.",
+            "example": "skate-park"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for filtering pages.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PageModel"
+                  },
+                  "title": "Response Sites-Get All Pages By Site"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/sites/site-id-from-item/{itemId}": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "summary": "Retrieve a site ID from an item ID",
+        "description": "Retrieves the site ID associated with a specific item ID. This is useful for determining which site an item belongs to.",
+        "operationId": "sites-get_site_id_from_item",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Itemid"
+            },
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteIdFromItemResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/create": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Create a page",
+        "description": "Creates a new page using the specified template under the parent page. You can set field values and the language for the new page.",
+        "operationId": "pages-create_page",
+        "parameters": [
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatePageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/add-language": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Add a language version to a page",
+        "description": "Adds a new language version for an existing page. This allows you to have the same page content available in multiple languages.",
+        "operationId": "pages-add_language_to_page",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "Job ID for auditing purposes",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLanguageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddLanguageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/components": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Add a component to a page",
+        "description": "Adds a component to a specific placeholder on a page. You can specify the component type, placeholder location, and configure its initial settings.",
+        "operationId": "pages-add_component_on_page",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddComponentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddComponentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve components on a page",
+        "description": "Retrieves a list of components that are currently added to a specific page.",
+        "operationId": "pages-get_components_on_page",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page from which to retrieve components.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "en",
+              "title": "Language",
+              "description": "The language code for filtering components.",
+              "example": "en"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version",
+              "description": "The version number of the page to retrieve components from.",
+              "example": 1
+            }
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPageComponentsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/components/{componentId}/datasource": {
+      "post": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Set the component datasource",
+        "description": "Sets the datasource for a specific component on a page. You can specify a new data source item or clear the existing one.",
+        "operationId": "pages-set_component_datasource",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid",
+              "description": "The unique identifier of the page.",
+              "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+            }
+          },
+          {
+            "name": "componentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Componentid",
+              "description": "The unique identifier of the component on the page.",
+              "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+            }
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetComponentDatasourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetComponentDatasourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/search": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Search for pages on a site",
+        "description": "Searches for all  pages in a specific site using a search term that matches page titles and content. The response returns the matching pages with their details including the page ID, path, and name.",
+        "operationId": "pages-search_site",
+        "parameters": [
+          {
+            "name": "search_query",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Search Query"
+            },
+            "description": "The search term to look for in page titles and content.",
+            "example": "skate"
+          },
+          {
+            "name": "site_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Name"
+            },
+            "description": "The unique name of the site to search within.",
+            "example": "skate-park"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for filtering pages.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PageSearchItemModel"
+                  },
+                  "title": "Response Pages-Search Site"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/path-by-url": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve the page path by live URL",
+        "description": "Retrieves the page item path that corresponds to a live URL on a website.",
+        "operationId": "pages-get_page_path_by_live_url",
+        "parameters": [
+          {
+            "name": "live_url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "minLength": 1,
+              "maxLength": 2083,
+              "title": "Live Url"
+            },
+            "description": "The full live URL of the page to look up.",
+            "example": "https%3A%2F%2Fwww.sitecore.com%2Fsitecore%2Fcontent%2FVerticals%2FSkatePark%2FHome"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagePathByLiveUrlResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/screenshot": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve the screenshot of a page",
+        "description": "Retrieves the screenshot of a specific page. This endpoint captures and returns a base64-encoded image of the live page.",
+        "operationId": "pages-get_page_screenshot",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            },
+            "description": "The version number of the page to retrieve the screenshot for.",
+            "example": 1
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for the page.",
+            "example": "en"
+          },
+          {
+            "name": "width",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1200,
+              "title": "Width"
+            },
+            "description": "The width of the screenshot in pixels.",
+            "example": 1200
+          },
+          {
+            "name": "height",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 800,
+              "title": "Height"
+            },
+            "description": "The height of the screenshot in pixels.",
+            "example": 800
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageScreenshotResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/html": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve the page HTML",
+        "description": "Retrieves the HTML content of a specific page. This endpoint returns the raw HTML of the page as it would appear in the browser.",
+        "operationId": "pages-get_page_html",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Language"
+            },
+            "description": "The language code for the page content.",
+            "example": "en"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            },
+            "description": "The version number of the page to retrieve.",
+            "example": 1
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageHtmlResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/preview-url": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve the page preview URL",
+        "description": "Retrieves the preview URL of a specific page. This endpoint returns the URL that can be used to preview the page.",
+        "operationId": "pages-get_page_preview_url",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for the page content.",
+            "example": "en"
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            },
+            "description": "The version number of the page to retrieve the preview URL for.",
+            "example": 1
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPagePreviewUrlResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/template-by-id": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve the page template by ID",
+        "description": "Retrieves the details of a specific page template, including its fields and settings. Use this endpoint to understand the structure and available fields of a template before creating a page.",
+        "operationId": "pages-get_page_template_by_id",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Templateid"
+            },
+            "description": "The unique identifier of the page template.",
+            "example": "2341ef32-42f4-4537-98d8-9ef741008eab"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageTemplateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "Retrieve the page details",
+        "description": "Retrieves the details about a page including its ID, name, and path location. This endpoint provides the information you need to understand and modify the page's structure.",
+        "operationId": "pages-get_page",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for the page content.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/pages/{pageId}/placeholders/{placeholderName}/allowed-components": {
+      "get": {
+        "tags": [
+          "Pages"
+        ],
+        "summary": "List allowed components for a placeholder",
+        "description": "Retrieves the list of components that can be added to a specific placeholder on a page. This ensures only compatible components are used in each placeholder. You can use * to fetch all components.",
+        "operationId": "pages-get_allowed_components_by_placeholder",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          {
+            "name": "placeholderName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Placeholdername"
+            },
+            "description": "The unique identifier of the placeholder.",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for filtering components.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ComponentShortInfo"
+                  },
+                  "title": "Response Pages-Get Allowed Components By Placeholder"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/create": {
+      "post": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Create content item",
+        "description": "Creates a new content item using the specified template and field values.",
+        "operationId": "content-create_content_item",
+        "parameters": [
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateContentItemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateContentItemResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/{itemId}": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Retrieve a content item by ID",
+        "description": "Retrieves the details of a specific content item by specifying its ID.",
+        "operationId": "content-get_content_item_by_id",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Itemid"
+            },
+            "description": "The unique identifier of the content item to be retrieved.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            },
+            "description": "The language version of the content item to be retrieved. If not specified, the default language is used.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentItemResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Update a content item",
+        "description": "Updates an existing content item, including its fields and language.",
+        "operationId": "content-update_content",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Itemid"
+            },
+            "description": "The unique identifier of the content item to be updated.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateContentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateContentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Delete a content item",
+        "description": "Deletes a content item and optionally all of its child items.",
+        "operationId": "content-delete_content",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Itemid"
+            },
+            "description": "The unique identifier of the content item to be deleted.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language version of the content item to be deleted.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteContentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "Retrieve a content item by path",
+        "description": "Retrieves the details of a content item by specifying its path in the content tree.",
+        "operationId": "content-get_content_item_by_path",
+        "parameters": [
+          {
+            "name": "item_path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Path"
+            },
+            "description": "The path of the content item in the content tree.",
+            "example": "%2Fsitecore%2Fcontent%2FVerticals%2FSkaterPark%2FHome"
+          },
+          {
+            "name": "failOnNotFound",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": true,
+              "title": "Failonnotfound"
+            },
+            "description": "Determines the behavior when the content item is not found.",
+            "example": "true"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language version of the content item to be retrieved.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ContentItemResponse"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  ],
+                  "title": "Response Content-Get Content Item By Path"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/content/{itemId}/insert-options": {
+      "get": {
+        "tags": [
+          "Content"
+        ],
+        "summary": "List insert options",
+        "description": "Retrieves a list of content templates that can be inserted as child items under the specified parent item.",
+        "operationId": "content-list_available_insertoptions",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Itemid"
+            },
+            "description": "The unique identifier of the parent item under which new items can be inserted.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code for filtering insert options.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InsertOptionModel"
+                  },
+                  "title": "Response Content-List Available Insertoptions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/components/{componentId}/datasources": {
+      "post": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "Create a component datasource",
+        "description": "Creates a new datasource item for a specific component using the provided data field values. The datasource will be created in the appropriate location based on the component's configuration.",
+        "operationId": "components-create_component_datasource",
+        "parameters": [
+          {
+            "name": "componentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Componentid"
+            },
+            "description": "The unique identifier of the component for which to create a datasource.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateComponentDatasourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateComponentDatasourceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/components/{componentId}/datasources/search": {
+      "get": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "Search for component datasources",
+        "description": "Searches for available datasources that can be used with a specific component. This helps you find existing content to use as datasources.",
+        "operationId": "components-search_component_datasources",
+        "parameters": [
+          {
+            "name": "componentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Componentid"
+            },
+            "description": "The unique identifier of the component for which to search datasources.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Term"
+            },
+            "description": "The search term to filter available datasources.",
+            "example": "news"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/components": {
+      "get": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "List components",
+        "description": "Retrieves a list of components available for a specific site, including both built-in components and custom components that can be used on pages.",
+        "operationId": "components-list_components",
+        "parameters": [
+          {
+            "name": "site_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site Name"
+            },
+            "description": "The name of the site for which to list available components.",
+            "example": "skate-park"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComponentsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/components/{componentId}": {
+      "get": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "Retrieve the component details",
+        "description": "Retrieves the details of a specific component, including its ID, name, and datasource options.",
+        "operationId": "components-get_component",
+        "parameters": [
+          {
+            "name": "componentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Componentid"
+            },
+            "description": "The unique identifier of the component.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComponentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assets/upload": {
+      "post": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Upload an asset",
+        "description": "Uploads a new digital asset to the system and stores it with the provided metadata.",
+        "operationId": "assets-upload_asset",
+        "parameters": [
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_assets-upload_asset"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadAssetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assets/search": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Search for assets",
+        "description": "Searches for digital assets such as videos, images, and documents using query terms, file types, or tags.",
+        "operationId": "assets-search_assets",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            },
+            "description": "The search term to filter assets.",
+            "example": "summer"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language code to filter assets.",
+            "example": "en"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            },
+            "description": "The file type to filter assets such as image, video, or document.",
+            "example": "image"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetSearchResultModel"
+                  },
+                  "title": "Response Assets-Search Assets"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assets/{assetId}": {
+      "get": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Retrieve the asset details",
+        "description": "Retrieves the details of a specific digital asset by specifying its ID.",
+        "operationId": "assets-get_asset_information",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assetid"
+            },
+            "description": "The unique identifier of the asset to be retrieved.",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetInformationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Assets"
+        ],
+        "summary": "Update an asset",
+        "description": "Updates the metadata and properties of an existing digital asset, such as alt text, description, and tags.",
+        "operationId": "assets-update_asset",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assetid"
+            },
+            "description": "The unique identifier of the asset to be updated.",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAssetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateAssetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments/languages": {
+      "get": {
+        "tags": [
+          "Environments"
+        ],
+        "summary": "List languages",
+        "description": "Retrieves all languages available.",
+        "operationId": "environments-list_languages",
+        "parameters": [
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API. ",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API. ",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LanguageModel"
+                  },
+                  "title": "Response Environments-List Languages"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/personalization/{pageId}/versions": {
+      "post": {
+        "tags": [
+          "Personalization"
+        ],
+        "summary": "Create a personalization variant",
+        "description": "Creates a new personalization variant of a page, enabling you to define targeting rules for different audiences.",
+        "operationId": "personalization-create_personalization_version",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page for which to create a personalization version.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePersonalizationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowDefinitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/personalization/by-page/{pageId}": {
+      "get": {
+        "tags": [
+          "Personalization"
+        ],
+        "summary": "List personalization variants by page",
+        "description": "Retrieves all personalization variants defined for a specific page, including IDs, names, creation dates, and associated variants.",
+        "operationId": "personalization-get_personalization_versions_by_page",
+        "parameters": [
+          {
+            "name": "pageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pageid"
+            },
+            "description": "The unique identifier of the page for which to retrieve personalization versions.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "en",
+              "title": "Language"
+            },
+            "description": "The language version of the page.",
+            "example": "en"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PersonalizationVariantDetailModel"
+                  },
+                  "title": "Response Personalization-Get Personalization Versions By Page"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/personalization/condition-templates": {
+      "get": {
+        "tags": [
+          "Personalization"
+        ],
+        "summary": "List personalization condition templates",
+        "description": "Retrieves all available condition templates for personalization.",
+        "operationId": "personalization-get_condition_templates",
+        "parameters": [
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConditionTemplate"
+                  },
+                  "title": "Response Personalization-Get Condition Templates"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/personalization/condition-templates/{template_id}": {
+      "get": {
+        "tags": [
+          "Personalization"
+        ],
+        "summary": "Retrieve a personalization condition template",
+        "description": "Retrieves a condition template by ID including its parameters for creating a personalization variant on a page.",
+        "operationId": "personalization-get_condition_template_by_id",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            },
+            "description": "The unique identifier of the condition template.",
+            "example": "returning_visitor"
+          },
+          {
+            "name": "x-sc-job-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+              "title": "X-Sc-Job-Id"
+            },
+            "description": "A unique identifier for the job, used to trace, audit, and revert actions performed by an AI agent through the Agent API.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConditionTemplate"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{jobId}/revert": {
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Revert a job",
+        "description": "Reverts the operations linked to a specific job ID, restoring the state prior to execution. This is useful for undoing changes made by automated processes.",
+        "operationId": "jobs-revert_job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jobid",
+              "description": "The unique identifier of the job to be reverted.",
+              "example": "job-1234"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Jobs-Revert Job"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Retrieve job details",
+        "description": "Retrieves the details of a specific job.",
+        "operationId": "jobs-get_job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jobid"
+            },
+            "description": "The unique identifier of the job to retrieve.",
+            "example": "job-1234"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Jobs-Get Job"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{jobId}/operations": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "List job operations",
+        "description": "Retrieves a list of actions associated with a specific job ID, including operation type, status, and timestamps, to support tracing and potential reversion of those actions.",
+        "operationId": "jobs-list_operations",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jobid",
+              "description": "The unique identifier of the job for which to list operations.",
+              "example": "job-1234"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Jobs-List Operations"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddComponentRequest": {
+        "properties": {
+          "componentRenderingId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Componentrenderingid",
+            "description": "The unique identifier of the component rendering definition.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "placeholderPath": {
+            "type": "string",
+            "title": "Placeholderpath",
+            "description": "The path of the placeholder where the component will be placed.",
+            "example": "/main/content"
+          },
+          "componentItemName": {
+            "type": "string",
+            "title": "Componentitemname",
+            "description": "The name of the component item to create.",
+            "example": "New sidebar component"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en",
+            "description": "The language code for the component.",
+            "example": "en"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "Field values to set on the component or its datasource."
+          }
+        },
+        "type": "object",
+        "required": [
+          "componentRenderingId",
+          "placeholderPath",
+          "componentItemName"
+        ],
+        "title": "AddComponentRequest"
+      },
+      "AddComponentResponse": {
+        "properties": {
+          "componentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Componentid",
+            "description": "The unique identifier of the newly added component.",
+            "example": "d290f1ee-6c54-4b01-90e6-d701748f0851"
+          },
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid",
+            "description": "The unique identifier of the page to which the component was added.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "placeholderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholderid",
+            "description": "The unique identifier of the placeholder where the component was placed.",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "datasourceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasourceid",
+            "description": "The unique identifier of the datasource used by the component, if applicable.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          }
+        },
+        "type": "object",
+        "title": "AddComponentResponse"
+      },
+      "AddLanguageRequest": {
+        "properties": {
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en",
+            "description": "The language code of the new version to add.",
+            "example": "en"
+          }
+        },
+        "type": "object",
+        "title": "AddLanguageRequest"
+      },
+      "AddLanguageResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the language version was added successfully.",
+            "example": true
+          }
+        },
+        "type": "object",
+        "title": "AddLanguageResponse"
+      },
+      "AllowedChildTemplateModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the allowed child template.",
+            "example": "Full Width Page"
+          },
+          "templateId": {
+            "type": "string",
+            "title": "Templateid",
+            "description": "The unique identifier of the allowed child template.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          }
+        },
+        "type": "object",
+        "title": "AllowedChildTemplateModel"
+      },
+      "AssetInformationMetadata": {
+        "properties": {
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width",
+            "description": "The width of the asset in pixels, or null if not applicable.",
+            "example": 1920
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height",
+            "description": "The height of the asset in pixels, or null if not applicable.",
+            "example": 1080
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "The file format of the asset (e.g., jpg, png), or null if not applicable.",
+            "example": "jpg"
+          },
+          "alt_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt Text",
+            "description": "Alternative text for the asset, or null if not provided.",
+            "example": "A beautiful sunset over the mountains."
+          }
+        },
+        "type": "object",
+        "title": "AssetInformationMetadata"
+      },
+      "AssetInformationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the asset.",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The name of the asset.",
+            "example": "Sample Image"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "The type of asset, for example, image or document.",
+            "example": "image"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "The URL where the asset can be accessed.",
+            "example": "https://example.com/assets/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "The size of the asset in bytes.",
+            "example": 204800
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetInformationMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Additional metadata about the asset."
+          },
+          "innerItem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InnerItemModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Details about the inner item if the asset is a container item."
+          }
+        },
+        "type": "object",
+        "title": "AssetInformationResponse"
+      },
+      "AssetMetadataModel": {
+        "properties": {
+          "alt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alt",
+            "description": "Alternative text for the asset, or null if not provided.",
+            "example": "A beautiful sunset over the mountains."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width",
+            "description": "The width of the asset in pixels, or null if not applicable.",
+            "example": 1920
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height",
+            "description": "The height of the asset in pixels, or null if not applicable.",
+            "example": 1080
+          },
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extension",
+            "description": "The file extension of the asset (e.g., jpg, png), or null if not applicable.",
+            "example": "jpg"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size",
+            "description": "The size of the asset in bytes, or null if not applicable.",
+            "example": 204800
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of the asset, or null if not provided.",
+            "example": "This is a sample image used for demonstration purposes."
+          }
+        },
+        "type": "object",
+        "title": "AssetMetadataModel"
+      },
+      "AssetSearchResultModel": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the asset.",
+            "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path of the asset in the content tree.",
+            "example": "/sitecore/media library/Images/Sample Image"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the asset.",
+            "example": "Sample Image"
+          },
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname",
+            "description": "The display name of the asset, or null if not set.",
+            "example": "Sample Image Display Name"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "The type of asset such as image or document.",
+            "example": "image"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template used by the asset.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "templateName": {
+            "type": "string",
+            "title": "Templatename",
+            "description": "The name of the template used by the asset.",
+            "example": "Image"
+          },
+          "innerItem": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetMetadataModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Metadata about the asset."
+          }
+        },
+        "type": "object",
+        "title": "AssetSearchResultModel"
+      },
+      "Body_assets-upload_asset": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File",
+            "description": "The file to upload as an asset. You must select a file from your local machine."
+          },
+          "upload_request": {
+            "type": "string",
+            "example": "{\n  \"name\":\"homeimage.jpg\",\n \"itemPath\": \"/sitecore/Media Library/Images\",\n \"language\": \"en\",\n \"extension\": \"jpg\",\n \"siteName\": \"skate-park\"\n  }",
+            "title": "Upload Request",
+            "description": "\n   A JSON string containing the following parameters for uploading an asset: \n -  `name` - the name of the asset. \n \n - `itemPath` - the path to the asset. \n\n - `language` - the language code of the asset. \n \n - `extension` - the asset's file extension. \n \n - `siteName` - the name of the site. process.\n\n JSON structure with example values: \n\n ```json\n{\n \"name\":  \"{YOUR_ASSETNAME}.jpg\",\n \"itemPath\": \"/sitecore/Media Library/Images\",\n\"language\": \"en\",\n \"extension\": \"jpg\",\n \"siteName\": \"skate-park\"\n}\n\n"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "upload_request"
+        ],
+        "title": "Body_assets-upload_asset"
+      },
+      "ComponentDetailsModel": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "d290f1ee-6c54-4b01-90e6-d701748f0851"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the item.",
+            "example": "Promo"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Displayname",
+            "description": "The display name of the item.",
+            "example": "Promotional Banner"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path to the item.",
+            "example": "/sitecore/content/Home/Promotions/Banners/Promotional Banner"
+          },
+          "template": {
+            "$ref": "#/components/schemas/ComponentTemplateModel"
+          },
+          "fields": {
+            "$ref": "#/components/schemas/ComponentFields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itemId",
+          "name",
+          "displayName",
+          "path",
+          "template",
+          "fields"
+        ],
+        "title": "ComponentDetailsModel"
+      },
+      "ComponentFields": {
+        "properties": {
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/FieldModel"
+            },
+            "type": "array",
+            "title": "Nodes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nodes"
+        ],
+        "title": "ComponentFields"
+      },
+      "ComponentGroup": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The title of the component group.",
+            "example": "Dynamic Placeholders"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/ComponentInfo"
+            },
+            "type": "array",
+            "title": "Components",
+            "description": "A list of components in the group."
+          }
+        },
+        "type": "object",
+        "title": "ComponentGroup"
+      },
+      "ComponentInfo": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category",
+            "description": "The category of the component.",
+            "example": "Dynamic Placeholders"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Displayname",
+            "description": "The display name of the component.",
+            "example": "Partial Design Dynamic Placeholder"
+          },
+          "iconUrl": {
+            "type": "string",
+            "title": "Iconurl",
+            "description": "The URL of the icon representing the component.",
+            "example": "/-/icon/Software/32x32/element.png.aspx"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The unique identifier of the component.",
+            "format": "uuid",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "componentName": {
+            "type": "string",
+            "title": "Componentname",
+            "description": "The internal name of the component.",
+            "example": "PartialDesignDynamicPlaceholder"
+          }
+        },
+        "type": "object",
+        "title": "ComponentInfo"
+      },
+      "ComponentModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the component instance.",
+            "example": "d290f1ee-6c54-4b01-90e6-d701748f0851"
+          },
+          "componentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Componentid",
+            "description": "The unique identifier of the component rendering definition.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "componentName": {
+            "type": "string",
+            "title": "Componentname",
+            "description": "The internal name of the component.",
+            "example": "PartialDesignDynamicPlaceholder"
+          },
+          "dataSource": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datasource",
+            "description": "The unique identifier of the datasource item used by the component, or null if not applicable.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholder",
+            "description": "The path of the placeholder where the component is placed, or null if not applicable.",
+            "example": "/main/content"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComponentParametersModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deviceId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deviceid",
+            "description": "The unique identifier of the device definition for which the component is configured, or null if not device-specific.",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "layoutId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layoutid",
+            "description": "The unique identifier of the layout definition in which the component is placed, or null if not applicable.",
+            "example": "321e6547-e89b-12d3-a456-426614174000"
+          },
+          "componentDetails": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComponentDetailsModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "componentId",
+          "componentName"
+        ],
+        "title": "ComponentModel"
+      },
+      "ComponentParametersModel": {
+        "properties": {
+          "GridParameters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gridparameters",
+            "description": "Grid parameters for the component, or null if not applicable.",
+            "example": "col-md-6"
+          },
+          "FieldNames": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fieldnames",
+            "description": "Field names associated with the component, or null if not applicable.",
+            "example": "Title, Description"
+          },
+          "Styles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Styles",
+            "description": "The styles for the component, or null if not applicable.",
+            "example": "background-color: red; color: white;"
+          },
+          "RenderingIdentifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renderingidentifier",
+            "description": "The unique identifier of the rendering, or null if not applicable.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "CSSStyles": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cssstyles",
+            "description": "CSS styles for the component, or null if not applicable.",
+            "example": "font-size: 16px; margin: 10px;"
+          },
+          "DynamicPlaceholderId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dynamicplaceholderid",
+            "description": "The identifier for dynamic placeholders, or null if not applicable.",
+            "example": "placeholder-1234"
+          }
+        },
+        "type": "object",
+        "title": "ComponentParametersModel"
+      },
+      "ComponentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the component.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the component.",
+            "example": "Promo"
+          },
+          "datasourceTemplateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Datasourcetemplateid",
+            "description": "The template ID for the component's datasource.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "datasourceLocations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Datasourcelocations",
+            "description": "A list of locations for the component's datasource.",
+            "example": [
+              "query:$site/*[@@name='Data']/*[@@templatename='Promo Folder']"
+            ]
+          },
+          "datasourceTemplatePath": {
+            "type": "string",
+            "title": "Datasourcetemplatepath",
+            "description": "The path to the datasource template.",
+            "example": "Feature/JSS Experience Accelerator/Page Content/Promo"
+          },
+          "datasourceFields": {
+            "items": {
+              "$ref": "#/components/schemas/DatasourceFieldNode"
+            },
+            "type": "array",
+            "title": "Datasourcefields",
+            "description": "A list of fields for the datasource."
+          },
+          "datasourceAutoGenerated": {
+            "type": "boolean",
+            "title": "Datasourceautogenerated",
+            "description": "Whether the datasource is auto-generated.",
+            "example": false
+          },
+          "datasourceRequired": {
+            "type": "boolean",
+            "title": "Datasourcerequired",
+            "description": "Whether the datasource is required.",
+            "example": true
+          },
+          "hasDynamicPlaceholder": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasdynamicplaceholder",
+            "description": "Whether the component has a dynamic placeholder.",
+            "example": true
+          }
+        },
+        "type": "object",
+        "title": "ComponentResponse"
+      },
+      "ComponentShortInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the component.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the component.",
+            "example": "Promo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ComponentShortInfo"
+      },
+      "ComponentTemplateModel": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the template.",
+            "example": "Promo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId",
+          "name"
+        ],
+        "title": "ComponentTemplateModel"
+      },
+      "Components": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ComponentGroup"
+            },
+            "type": "array",
+            "title": "Groups",
+            "description": "A list of component groups."
+          },
+          "ungrouped": {
+            "items": {
+              "$ref": "#/components/schemas/ComponentInfo"
+            },
+            "type": "array",
+            "title": "Ungrouped",
+            "default": [],
+            "description": "A list of ungrouped components."
+          }
+        },
+        "type": "object",
+        "title": "Components"
+      },
+      "ComponentsResponse": {
+        "properties": {
+          "components": {
+            "$ref": "#/components/schemas/Components",
+            "description": "Components available for the specified site."
+          }
+        },
+        "type": "object",
+        "title": "ComponentsResponse"
+      },
+      "ConditionTemplate": {
+        "properties": {
+          "href": {
+            "type": "string",
+            "title": "Href",
+            "description": "The URL of the condition template.",
+            "example": "https://www.example.com/condition-template"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "A reference identifier for the condition template.",
+            "example": "ConditionTemplate-12345"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the condition template.",
+            "example": "Time on Site"
+          },
+          "modifiedByRef": {
+            "type": "string",
+            "title": "Modifiedbyref",
+            "description": "A reference identifier for the user who last modified the condition template.",
+            "example": "User-67890"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "title": "Modifiedat",
+            "description": "The timestamp when the condition template was last modified.",
+            "example": "2025-01-15T10:30:00Z"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "The revision number of the condition template.",
+            "example": 3
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived",
+            "description": "Whether the condition template is archived.",
+            "example": false
+          },
+          "friendlyId": {
+            "type": "string",
+            "title": "Friendlyid",
+            "description": "A user-friendly identifier for the condition template.",
+            "example": "time_on_site"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The type of the condition template.",
+            "example": "time-based"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The status of the condition template.",
+            "example": "active"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "description": "The icon representing the condition template.",
+            "example": "https://www.example.com/icons/time-on-site.png"
+          },
+          "additionalFields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Additionalfields",
+            "description": "A key-value map of additional fields for the condition template."
+          },
+          "templateElements": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Templateelements",
+            "description": "A list of template elements for the condition template."
+          },
+          "defaultTemplate": {
+            "type": "boolean",
+            "title": "Defaulttemplate",
+            "description": "Whether the condition template is the default.",
+            "example": false
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "customTemplate": {
+            "type": "boolean",
+            "title": "Customtemplate",
+            "description": "Whether the condition template is custom.",
+            "example": true
+          },
+          "clientKey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientkey",
+            "description": "The client key for the condition template, or null if not applicable.",
+            "example": "pers123jgltUp"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of the condition template, or null if not provided.",
+            "example": "This condition is based on the time a user spends on the site."
+          },
+          "revisionComment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revisioncomment",
+            "description": "A comment about the revision of the condition template, or null if not provided.",
+            "example": "Updated time thresholds for better accuracy."
+          },
+          "render": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render",
+            "description": "Whether to render the condition template, or null if not applicable.",
+            "example": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "href",
+          "ref",
+          "name",
+          "modifiedByRef",
+          "modifiedAt",
+          "revision",
+          "archived",
+          "friendlyId",
+          "type",
+          "status",
+          "icon",
+          "additionalFields",
+          "templateElements",
+          "defaultTemplate",
+          "tags",
+          "customTemplate"
+        ],
+        "title": "ConditionTemplate"
+      },
+      "ContentItemResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the content item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the content item.",
+            "example": "New Article"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path of the content item in the content tree.",
+            "example": "/sitecore/content/Skate Park/Home/New Article"
+          },
+          "workflow": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkflowModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContentItemResponse"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The version number of the content item, or null if not applicable.",
+            "example": 1
+          },
+          "template": {
+            "$ref": "#/components/schemas/models__content__TemplateModel"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A key-value map of field names and their values for the content item.",
+            "title": "Fields"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the content item was created.",
+            "example": "2025-01-15T10:30:00Z",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The timestamp when the content item was updated.",
+            "example": "2025-01-15T10:30:00Z",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "title": "ContentItemResponse"
+      },
+      "CreateComponentDatasourceRequest": {
+        "properties": {
+          "siteName": {
+            "type": "string",
+            "title": "Sitename",
+            "description": "The name of the site for which the datasource is created.",
+            "example": "skate-park"
+          },
+          "dataFields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Datafields",
+            "description": "A key-value map of data field names and their values for the datasource.",
+            "example": {
+              "PromoText": "Summer Sale"
+            }
+          },
+          "children": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Children",
+            "description": "A list of child datasource objects, or null if none.",
+            "example": null
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en",
+            "description": "The language code for the datasource.",
+            "example": "en"
+          }
+        },
+        "type": "object",
+        "required": [
+          "siteName",
+          "dataFields"
+        ],
+        "title": "CreateComponentDatasourceRequest"
+      },
+      "CreateComponentDatasourceResponse": {
+        "properties": {
+          "datasourceId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Datasourceid",
+            "description": "The unique identifier of the created datasource.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "datasourceLocation": {
+            "type": "string",
+            "title": "Datasourcelocation",
+            "description": "The location path of the created datasource.",
+            "example": "/sitecore/content/Verticals/SkatePark/Data/Promos"
+          }
+        },
+        "type": "object",
+        "title": "CreateComponentDatasourceResponse"
+      },
+      "CreateContentItemRequest": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template used to create the content item.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the content item to create.",
+            "example": "New Promo"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Parentid",
+            "description": "The unique identifier of the parent item.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en",
+            "description": "The language code for the content item.",
+            "example": "en"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "A key-value map of field names and their values for the content item, or null if none.",
+            "example": null
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId",
+          "name",
+          "parentId"
+        ],
+        "title": "CreateContentItemRequest"
+      },
+      "CreateContentItemResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the created content item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the created content item.",
+            "example": "New Promo"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path of the created content item.",
+            "example": "/sitecore/layout/Renderings/Feature/JSS Experience Accelerator/Page Content/Promo/New Promo"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template used for the content item.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          }
+        },
+        "type": "object",
+        "title": "CreateContentItemResponse"
+      },
+      "CreatePageRequest": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the page template to be used for the new page.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the page to create.",
+            "example": "About Us"
+          },
+          "parentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Parentid",
+            "description": "The unique identifier of the parent item for the new page.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en",
+            "description": "The language code for the new page.",
+            "example": "en"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "A list of field objects to set on the page, or null if none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId",
+          "name",
+          "parentId"
+        ],
+        "title": "CreatePageRequest"
+      },
+      "CreatePageResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the created page.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the created page.",
+            "example": "About Us"
+          }
+        },
+        "type": "object",
+        "title": "CreatePageResponse"
+      },
+      "CreatePersonalizationRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the personalization rule.",
+            "example": "Summer Sale Personalization"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "default": "en",
+            "description": "The language code for the personalization rule, or null for default.",
+            "example": "en"
+          },
+          "variant_name": {
+            "type": "string",
+            "title": "Variant Name",
+            "description": "The name of the personalization variant.",
+            "example": "Summer Sale Variant"
+          },
+          "audience_name": {
+            "type": "string",
+            "title": "Audience Name",
+            "description": "The name of the audience for the personalization rule.",
+            "example": "Returning Customers"
+          },
+          "condition_template_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Condition Template Id",
+            "description": "The unique identifier of the condition template to be used.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "condition_params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Condition Params",
+            "description": "A key-value map of parameters for the condition template."
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "variant_name",
+          "audience_name",
+          "condition_template_id",
+          "condition_params"
+        ],
+        "title": "CreatePersonalizationRequest"
+      },
+      "DatasourceFieldNode": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the datasource field.",
+            "example": "PromoText"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The type of datasource field.",
+            "example": "Rich Text"
+          },
+          "validation": {
+            "type": "string",
+            "title": "Validation",
+            "description": "Validation rules for the datasource field.",
+            "example": ""
+          }
+        },
+        "type": "object",
+        "title": "DatasourceFieldNode"
+      },
+      "DeleteContentResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the content item was deleted successfully.",
+            "example": true
+          },
+          "deletedId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Deletedid",
+            "description": "The unique identifier of the deleted content item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          }
+        },
+        "type": "object",
+        "title": "DeleteContentResponse"
+      },
+      "FieldModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the field.",
+            "example": "Title"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value",
+            "description": "The value of the field.",
+            "example": "Welcome to Our Site"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "FieldModel"
+      },
+      "FlowDefinitionCondition": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "title": "Templateid",
+            "description": "The unique identifier of the condition template.",
+            "example": "cond-6c54-4b01-90e6-d701748f0851"
+          },
+          "params": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Params",
+            "description": "A key-value map of parameters for the condition."
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId",
+          "params"
+        ],
+        "title": "FlowDefinitionCondition"
+      },
+      "FlowDefinitionConditionGroup": {
+        "properties": {
+          "conditions": {
+            "items": {
+              "$ref": "#/components/schemas/FlowDefinitionCondition"
+            },
+            "type": "array",
+            "title": "Conditions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conditions"
+        ],
+        "title": "FlowDefinitionConditionGroup"
+      },
+      "FlowDefinitionResponse": {
+        "properties": {
+          "clientKey": {
+            "type": "string",
+            "title": "Clientkey",
+            "description": "The client key associated with the flow definition.",
+            "example": "pers12345"
+          },
+          "href": {
+            "type": "string",
+            "title": "Href",
+            "description": "The URL of the flow definition.",
+            "example": "https://www.example.com/flow-definition"
+          },
+          "ref": {
+            "type": "string",
+            "title": "Ref",
+            "description": "A reference identifier for the flow definition.",
+            "example": "FlowDefinition-12345"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the flow definition.",
+            "example": "User Registration Flow"
+          },
+          "modifiedByRef": {
+            "type": "string",
+            "title": "Modifiedbyref",
+            "description": "A reference identifier for the user who last modified the flow definition.",
+            "example": "User-67890"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "title": "Modifiedat",
+            "description": "The timestamp when the flow definition was last modified.",
+            "example": "2025-01-15T10:30:00Z"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "The revision number of the flow definition.",
+            "example": 2
+          },
+          "archived": {
+            "type": "boolean",
+            "title": "Archived",
+            "description": "Whether the flow definition is archived.",
+            "example": false
+          },
+          "friendlyId": {
+            "type": "string",
+            "title": "Friendlyid",
+            "description": "A user-friendly identifier for the flow definition.",
+            "example": "user_registration_flow"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The type of the flow definition.",
+            "example": "user_registration"
+          },
+          "subtype": {
+            "type": "string",
+            "title": "Subtype",
+            "description": "The subtype of the flow definition.",
+            "example": "user_registration_form"
+          },
+          "channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channels",
+            "description": "A list of channels associated with the flow definition, such as web or mobile."
+          },
+          "triggers": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triggers",
+            "description": "A list of triggers for the flow definition, or null if none."
+          },
+          "dashboardLinks": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dashboardlinks",
+            "description": "A list of dashboard links for the flow definition, or null if none."
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags",
+            "description": "A list of tags associated with the flow definition, or null if none."
+          },
+          "businessProcess": {
+            "type": "string",
+            "title": "Businessprocess",
+            "description": "The business process associated with the flow definition.",
+            "example": "user_registration"
+          },
+          "siteId": {
+            "type": "string",
+            "title": "Siteid",
+            "description": "The unique identifier of the site associated with the flow definition.",
+            "example": "site_123"
+          },
+          "traffic": {
+            "$ref": "#/components/schemas/FlowDefinitionTraffic"
+          },
+          "transpiledVariants": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transpiledvariants",
+            "description": "A list of transpiled variants for the flow definition, or null if none."
+          },
+          "variants": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variants",
+            "description": "A list of variants for the flow definition, or null if none."
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "The current status of the flow definition.",
+            "example": "active"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/FlowDefinitionSchedule"
+          },
+          "revisions": {
+            "$ref": "#/components/schemas/FlowDefinitionRevisions"
+          },
+          "sampleSizeConfig": {
+            "$ref": "#/components/schemas/FlowDefinitionSampleSizeConfig"
+          },
+          "notificationEnabled": {
+            "type": "boolean",
+            "title": "Notificationenabled"
+          }
+        },
+        "type": "object",
+        "title": "FlowDefinitionResponse"
+      },
+      "FlowDefinitionRevisions": {
+        "properties": {
+          "href": {
+            "type": "string",
+            "title": "Href",
+            "description": "The URL to access the revisions of the flow definition.",
+            "example": "https://www.example.com/flow-definition/revisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "href"
+        ],
+        "title": "FlowDefinitionRevisions"
+      },
+      "FlowDefinitionSampleSizeConfig": {
+        "properties": {
+          "baseValue": {
+            "type": "number",
+            "title": "Basevalue",
+            "description": "The base value used for sample size calculation.",
+            "example": 0.5
+          },
+          "minimumDetectableDifference": {
+            "type": "number",
+            "title": "Minimumdetectabledifference",
+            "description": "The minimum detectable difference for the sample size calculation.",
+            "example": 0.1
+          },
+          "confidenceLevel": {
+            "type": "number",
+            "title": "Confidencelevel",
+            "description": "The confidence level for the sample size calculation.",
+            "example": 0.95
+          }
+        },
+        "type": "object",
+        "required": [
+          "baseValue",
+          "minimumDetectableDifference",
+          "confidenceLevel"
+        ],
+        "title": "FlowDefinitionSampleSizeConfig"
+      },
+      "FlowDefinitionSchedule": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The type of schedule for the flow definition.",
+            "example": "immediate"
+          },
+          "startDate": {
+            "type": "string",
+            "title": "Startdate",
+            "description": "The start date of the schedule.",
+            "example": "2023-01-01T00:00:00Z"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "startDate"
+        ],
+        "title": "FlowDefinitionSchedule"
+      },
+      "FlowDefinitionSplit": {
+        "properties": {
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "description": "The flow definition template.",
+            "example": "split-6c54-4b01-90e6-d701748f0851"
+          },
+          "variantName": {
+            "type": "string",
+            "title": "Variantname",
+            "description": "The name of the variant.",
+            "example": "Variant A"
+          },
+          "audienceName": {
+            "type": "string",
+            "title": "Audiencename",
+            "description": "The name of the audience targeted.",
+            "example": "Returning Visitors"
+          },
+          "conditionGroups": {
+            "items": {
+              "$ref": "#/components/schemas/FlowDefinitionConditionGroup"
+            },
+            "type": "array",
+            "title": "Conditiongroups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "template",
+          "variantName",
+          "audienceName",
+          "conditionGroups"
+        ],
+        "title": "FlowDefinitionSplit"
+      },
+      "FlowDefinitionTraffic": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The type of traffic distribution for the flow definition.",
+            "example": "unique"
+          },
+          "weightingAlgorithm": {
+            "type": "string",
+            "title": "Weightingalgorithm",
+            "description": "The algorithm used for weighting traffic distribution.",
+            "example": "random"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "title": "Modifiedat",
+            "description": "The timestamp when the traffic distribution was last modified.",
+            "example": "2023-01-01T00:00:00Z"
+          },
+          "splits": {
+            "items": {
+              "$ref": "#/components/schemas/FlowDefinitionSplit"
+            },
+            "type": "array",
+            "title": "Splits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "weightingAlgorithm",
+          "modifiedAt",
+          "splits"
+        ],
+        "title": "FlowDefinitionTraffic"
+      },
+      "GetPageComponentsResponse": {
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid",
+            "description": "The unique identifier of the page.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "pageName": {
+            "type": "string",
+            "title": "Pagename",
+            "description": "The name of the page.",
+            "example": "Home Page"
+          },
+          "pagePath": {
+            "type": "string",
+            "title": "Pagepath",
+            "description": "The path to the page.",
+            "example": "/sitecore/content/Home"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "The version number of the page.",
+            "example": 1
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "description": "The language code of the page.",
+            "example": "en"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route",
+            "description": "The route of the page, or null if not applicable.",
+            "example": "/home"
+          },
+          "layoutEditingKind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layouteditingkind",
+            "description": "The layout editing kind of the page, or null if not applicable.",
+            "example": "Standard"
+          },
+          "template": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/models__pages__TemplateModel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The template used for the page, or null if not applicable.",
+            "example": "Page Template"
+          },
+          "components": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ComponentModel"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Components",
+            "description": "A list of components on the page, or null if none.",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "pageId",
+          "pageName",
+          "pagePath",
+          "version",
+          "language"
+        ],
+        "title": "GetPageComponentsResponse"
+      },
+      "GetPagePreviewUrlResponse": {
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid",
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          "previewUrl": {
+            "type": "string",
+            "maxLength": 2083,
+            "minLength": 1,
+            "format": "uri",
+            "title": "Previewurl",
+            "description": "The preview URL of the page.",
+            "example": "https://preview.example.com/page/f0b81bc-7388-46be-b109-6e73d1114470"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pageId",
+          "previewUrl"
+        ],
+        "title": "GetPagePreviewUrlResponse"
+      },
+      "GetPageResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the page.",
+            "example": "Home Page"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The template ID used for the page.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "locationPath": {
+            "type": "string",
+            "title": "Locationpath",
+            "description": "The location path of the page in the content tree.",
+            "example": "/sitecore/content/Verticals/SkatePark/Home/Home Page"
+          },
+          "insertOptions": {
+            "items": {
+              "$ref": "#/components/schemas/PageInsertOptionModel"
+            },
+            "description": "A list of options for inserting the page.",
+            "type": "array",
+            "title": "Insertoptions"
+          }
+        },
+        "type": "object",
+        "title": "GetPageResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InnerItemModel": {
+        "properties": {
+          "displayName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Displayname",
+            "description": "The display name of the inner item, or null if not set.",
+            "example": "Promo Image"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height",
+            "description": "The height of the inner item, or null if not set.",
+            "example": 250
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width",
+            "description": "The width of the inner item, or null if not set.",
+            "example": 300
+          }
+        },
+        "type": "object",
+        "title": "InnerItemModel"
+      },
+      "InsertOptionModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the insert option.",
+            "example": "Full Width Page"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The ID of the template used for the insert option.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          }
+        },
+        "type": "object",
+        "title": "InsertOptionModel"
+      },
+      "LanguageModel": {
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "title": "Displayname",
+            "description": "The display name of the language.",
+            "example": "English"
+          },
+          "iso": {
+            "type": "string",
+            "title": "Iso",
+            "description": "The ISO code of the language.",
+            "example": "en"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the language.",
+            "example": "en"
+          }
+        },
+        "type": "object",
+        "required": [
+          "displayName",
+          "iso",
+          "name"
+        ],
+        "title": "LanguageModel"
+      },
+      "ListSitesResponse": {
+        "properties": {
+          "sites": {
+            "items": {
+              "$ref": "#/components/schemas/SiteBasicModel"
+            },
+            "type": "array",
+            "title": "Sites",
+            "description": "A list of sites."
+          }
+        },
+        "type": "object",
+        "title": "ListSitesResponse"
+      },
+      "MediaItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the media item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "embedUrl": {
+            "type": "string",
+            "title": "Embedurl",
+            "description": "The URL to embed or access the media item.",
+            "example": "https://example.com/media/3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "description": "The size of the media item in bytes.",
+            "example": 204800
+          },
+          "dimensions": {
+            "type": "string",
+            "title": "Dimensions",
+            "description": "The dimensions of the media item.",
+            "example": "1920x1080"
+          },
+          "extension": {
+            "type": "string",
+            "title": "Extension",
+            "description": "The file extension of the media item.",
+            "example": "mp4"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "embedUrl",
+          "size",
+          "dimensions",
+          "extension"
+        ],
+        "title": "MediaItem"
+      },
+      "NonVisualContentLocationModel": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the item.",
+            "example": "Sample Item"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path to the item.",
+            "example": "/content/items/3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "allowed_child_content_templates": {
+            "items": {
+              "$ref": "#/components/schemas/AllowedChildTemplateModel"
+            },
+            "type": "array",
+            "title": "Allowed Child Content Templates",
+            "description": "A list of allowed child content templates."
+          }
+        },
+        "type": "object",
+        "title": "NonVisualContentLocationModel"
+      },
+      "PageHtmlResponse": {
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid",
+            "description": "The unique identifier of the page.",
+            "example": "f0b81bc-7388-46be-b109-6e73d1114470"
+          },
+          "html": {
+            "type": "string",
+            "title": "Html",
+            "description": "The HTML content of the page.",
+            "example": "<html><body><h1>Webpage content</h1></body></html>"
+          }
+        },
+        "type": "object",
+        "title": "PageHtmlResponse",
+        "description": "Response model containing the HTML content of a page."
+      },
+      "PageInsertOptionModel": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the template.",
+            "example": "Full Width Page"
+          }
+        },
+        "type": "object",
+        "title": "PageInsertOptionModel"
+      },
+      "PageLocationModel": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the item.",
+            "example": "Sample Item"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path to the item.",
+            "example": "/content/items/3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "allowed_child_page_templates": {
+            "items": {
+              "$ref": "#/components/schemas/AllowedChildTemplateModel"
+            },
+            "type": "array",
+            "title": "Allowed Child Page Templates",
+            "description": "A list of allowed child page templates."
+          }
+        },
+        "type": "object",
+        "title": "PageLocationModel"
+      },
+      "PageModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the page.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path to the page.",
+            "example": "/content/pages/3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          }
+        },
+        "type": "object",
+        "title": "PageModel"
+      },
+      "PagePathByLiveUrlResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the item.",
+            "example": "Home"
+          },
+          "hasPresentation": {
+            "type": "boolean",
+            "title": "Haspresentation",
+            "description": "Whether the item has presentation details.",
+            "example": true
+          },
+          "template": {
+            "$ref": "#/components/schemas/PagePathTemplateModel",
+            "description": "The template details of the item."
+          },
+          "insertOptions": {
+            "items": {
+              "$ref": "#/components/schemas/PagePathInsertOptionModel"
+            },
+            "type": "array",
+            "description": "Insert options for the item.",
+            "title": "Insertoptions"
+          }
+        },
+        "type": "object",
+        "title": "PagePathByLiveUrlResponse"
+      },
+      "PagePathInsertOptionModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the insert option.",
+            "example": "Full Width Page"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          }
+        },
+        "type": "object",
+        "title": "PagePathInsertOptionModel"
+      },
+      "PagePathTemplateModel": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the template.",
+            "example": "Full Width Page"
+          }
+        },
+        "type": "object",
+        "title": "PagePathTemplateModel"
+      },
+      "PageScreenshotResponse": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The type of screenshot.",
+            "example": "png"
+          },
+          "fullPage": {
+            "type": "boolean",
+            "title": "Fullpage",
+            "description": "Whether the screenshot is of the full page.",
+            "example": true
+          },
+          "encoding": {
+            "type": "string",
+            "title": "Encoding",
+            "description": "The encoding format of the screenshot.",
+            "example": "base64"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp",
+            "description": "The timestamp when the screenshot was taken.",
+            "example": "2023-09-01T12:00:00Z"
+          },
+          "screenshot_base64": {
+            "type": "string",
+            "title": "Screenshot Base64",
+            "description": "The base64-encoded screenshot data.",
+            "example": "iVBORw0KGgoAAAANSUhEUgAA..."
+          }
+        },
+        "type": "object",
+        "title": "PageSearchFieldModel"
+      },
+      "PageSearchItemModel": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the item.",
+            "example": "Home"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path of the item.",
+            "example": "/sitecore/content/verticals/SkatePark/home"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldModel"
+            },
+            "type": "array",
+            "title": "Fields",
+            "description": "A list of search fields associated with the item."
+          }
+        },
+        "type": "object",
+        "title": "PageSearchItemModel"
+      },
+      "PageTemplateFieldModel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the field.",
+            "example": "Content"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "The field type.",
+            "example": "single-line text"
+          },
+          "validation": {
+            "type": "boolean",
+            "title": "Validation",
+            "description": "Whether the field has validation rules.",
+            "example": false
+          }
+        },
+        "type": "object",
+        "title": "PageTemplateFieldModel"
+      },
+      "PageTemplateResponse": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the template.",
+            "example": "Full Width Page"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PageTemplateFieldModel"
+            },
+            "type": "array",
+            "title": "Fields",
+            "description": "A list of fields associated with the template."
+          }
+        },
+        "type": "object",
+        "title": "PageTemplateResponse"
+      },
+      "PersonalizationVariantDetailModel": {
+        "properties": {
+          "page_id": {
+            "type": "string",
+            "title": "Page Id",
+            "description": "The unique identifier of the page.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "variant_name": {
+            "type": "string",
+            "title": "Variant Name",
+            "description": "The name of the variant.",
+            "example": "Variant A"
+          },
+          "audience_name": {
+            "type": "string",
+            "title": "Audience Name",
+            "description": "The name of the audience targeted by the variant.",
+            "example": "Returning Visitors"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "description": "The template used for the variant.",
+            "example": "Default Template"
+          },
+          "condition_groups": {
+            "items": {
+              "$ref": "#/components/schemas/FlowDefinitionConditionGroup"
+            },
+            "type": "array",
+            "title": "Condition Groups",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "page_id",
+          "variant_name",
+          "audience_name",
+          "template"
+        ],
+        "title": "PersonalizationVariantDetailModel"
+      },
+      "SearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "default": [],
+            "description": "A list of search results."
+          }
+        },
+        "type": "object",
+        "title": "SearchResponse"
+      },
+      "SearchResult": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template associated with the item.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the item.",
+            "example": "Hero Banner"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itemId",
+          "templateId",
+          "name"
+        ],
+        "title": "SearchResult"
+      },
+      "SetComponentDatasourceRequest": {
+        "properties": {
+          "datasourceId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Datasourceid",
+            "description": "The unique identifier of the datasource to set for the component.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "default": "en",
+            "description": "The language for the datasource.",
+            "example": "en"
+          }
+        },
+        "type": "object",
+        "required": [
+          "datasourceId"
+        ],
+        "title": "SetComponentDatasourceRequest"
+      },
+      "SetComponentDatasourceResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the datasource was set successfully.",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "A message providing additional information about the operation.",
+            "example": "Datasource set successfully."
+          },
+          "componentId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Componentid",
+            "description": "The unique identifier of the component.",
+            "example": "86a03271-dff4-470a-92bd-b68c67de2e25"
+          },
+          "pageId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pageid",
+            "description": "The unique identifier of the page.",
+            "example": "9f8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "datasourceId": {
+            "type": "string",
+            "title": "Datasourceid",
+            "description": "The unique identifier of the datasource.",
+            "example": "Hero Banner"
+          }
+        },
+        "type": "object",
+        "title": "SetComponentDatasourceResponse"
+      },
+      "SiteBasicModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the site.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the site.",
+            "example": "skate-park"
+          },
+          "targetHostname": {
+            "type": "string",
+            "title": "Targethostname",
+            "description": "The target hostname of the site.",
+            "example": "skate-park.example.com"
+          },
+          "rootPath": {
+            "type": "string",
+            "title": "Rootpath",
+            "description": "The root path of the site.",
+            "example": "/sitecore/content/SkatePark"
+          }
+        },
+        "type": "object",
+        "title": "SiteBasicModel"
+      },
+      "SiteIdFromItemResponse": {
+        "properties": {
+          "siteRootItemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Siterootitemid",
+            "description": "The unique identifier of the site root item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "siteRootDisplayName": {
+            "type": "string",
+            "title": "Siterootdisplayname",
+            "description": "The display name of the site root.",
+            "example": "Skate Park"
+          },
+          "siteRootName": {
+            "type": "string",
+            "title": "Siterootname",
+            "description": "The name of the site root.",
+            "example": "Skate Park"
+          }
+        },
+        "type": "object",
+        "title": "SiteIdFromItemResponse"
+      },
+      "SiteInformationResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the site.",
+            "example": "skate-park"
+          },
+          "brand_information": {
+            "type": "string",
+            "title": "Brand Information",
+            "description": "Information about the brand associated with the site.",
+            "example": "Skate park brand guidelines"
+          },
+          "rootPath": {
+            "type": "string",
+            "title": "Rootpath",
+            "description": "The root path of the site.",
+            "example": "/sitecore/content/SkatePark"
+          },
+          "page_locations": {
+            "items": {
+              "$ref": "#/components/schemas/PageLocationModel"
+            },
+            "type": "array",
+            "title": "Page Locations",
+            "description": "A list of page locations associated with the site."
+          },
+          "non_visual_content_locations": {
+            "items": {
+              "$ref": "#/components/schemas/NonVisualContentLocationModel"
+            },
+            "type": "array",
+            "title": "Non Visual Content Locations",
+            "description": "A list of non-visual content locations associated with the site."
+          }
+        },
+        "type": "object",
+        "title": "SiteInformationResponse"
+      },
+      "UpdateAssetRequest": {
+        "properties": {
+          "fields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Fields",
+            "description": "A key-value map of metadata fields to update for the asset."
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "description": "The new language code of the asset.",
+            "example": "en"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The new name for the asset. If null, the name will not be updated.",
+            "example": "Skateboarder"
+          },
+          "altText": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alttext",
+            "default": "",
+            "description": "The new alt text for the asset. If null, the alt text will not be updated.",
+            "example": "A skateboarder performing a trick"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields",
+          "language"
+        ],
+        "title": "UpdateAssetRequest"
+      },
+      "UpdateAssetResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the asset.",
+            "example": "As8c7e6d-5b4a-4c3d-8e7f-1a2b3c4d5e6f"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The updated name of the asset.",
+            "example": "Skateboarder in action"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path to the asset.",
+            "example": "/media/assets/As8c7e6d-5b4"
+          },
+          "updatedFields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Updatedfields",
+            "description": "The fields that were updated in the asset."
+          }
+        },
+        "type": "object",
+        "title": "UpdateAssetResponse"
+      },
+      "UpdateContentRequest": {
+        "properties": {
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields",
+            "description": "A key-value map of fields to update for the content item. If null, fields will not be updated."
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en",
+            "description": "The language code for the content item.",
+            "example": "en"
+          },
+          "createNewVersion": {
+            "type": "boolean",
+            "title": "Createnewversion",
+            "default": false,
+            "description": "Whether to create a new version of the content item.",
+            "example": false
+          },
+          "siteName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sitename",
+            "description": "The unique name of the site where the content item resides.",
+            "example": "skate-park"
+          }
+        },
+        "type": "object",
+        "title": "UpdateContentRequest"
+      },
+      "UpdateContentResponse": {
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Itemid",
+            "description": "The unique identifier of the content item.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the content item.",
+            "example": "Sample Content Item"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "The path to the content item.",
+            "example": "/content/items/3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "updatedFields": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Updatedfields",
+            "description": "The fields that were updated in the content item."
+          }
+        },
+        "type": "object",
+        "title": "UpdateContentResponse"
+      },
+      "UploadAssetResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "Whether the asset upload was successful.",
+            "example": true
+          },
+          "mediaItem": {
+            "$ref": "#/components/schemas/MediaItem"
+          }
+        },
+        "type": "object",
+        "title": "UploadAssetResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location",
+            "description": "The location of the error in the request."
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message",
+            "description": "The error message."
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type",
+            "description": "The type of error."
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WorkflowModel": {
+        "properties": {
+          "workflowState": {
+            "$ref": "#/components/schemas/WorkflowStateModel"
+          }
+        },
+        "type": "object",
+        "description": "Model representing the workflow state of an item.",
+        "required": [
+          "workflowState"
+        ],
+        "title": "WorkflowModel"
+      },
+      "WorkflowStateModel": {
+        "properties": {
+          "final": {
+            "type": "boolean",
+            "title": "Final",
+            "description": "Whether this is a final workflow state.",
+            "example": false
+          },
+          "displayName": {
+            "type": "string",
+            "title": "Displayname",
+            "description": "The display name of the workflow state.",
+            "example": "Published"
+          }
+        },
+        "type": "object",
+        "required": [
+          "final",
+          "displayName"
+        ],
+        "title": "WorkflowStateModel"
+      },
+      "models__content__TemplateModel": {
+        "properties": {
+          "templateId": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Templateid",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the template.",
+            "example": "Article Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templateId",
+          "name"
+        ],
+        "title": "TemplateModel"
+      },
+      "models__pages__TemplateModel": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "The unique identifier of the template.",
+            "example": "3f2504e0-4f89-11d3-9a0c-0305e82c3301"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The name of the template.",
+            "example": "Article Page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "TemplateModel"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
