@@ -86,30 +86,11 @@ The agent automatically:
 ```
 MAF-Sitecore-Agent-API/
 ├── sitecore_agent.py       # Main agent implementation
-├── tutorial1.py            # Basic agent operations tutorial
-├── tutorial2.py            # Image analysis tutorial
-├── tutorial3.py            # Multi-turn conversations tutorial
-├── tutorial4.py            # Function tools tutorial
-├── tutorial4-sitecore.py   # Sitecore OpenAPI tutorial
 ├── index.json              # Cached OpenAPI spec (auto-updated)
 ├── requirements.txt        # Python dependencies
 ├── .env.sample             # Environment variables template
+├── .gitignore              # Git ignore file
 └── README.md               # This file
-```
-
-## Tutorials
-
-The project includes several tutorials demonstrating Microsoft Agent Framework features:
-
-- **tutorial1.py**: Basic agent operations (run, stream, ChatMessage)
-- **tutorial2.py**: Image analysis with vision models
-- **tutorial3.py**: Multi-turn conversations with threads
-- **tutorial4.py**: Function tools (simple, decorated, class-based)
-- **tutorial4-sitecore.py**: OpenAPI specification tools overview
-
-Run any tutorial:
-```bash
-python tutorial1.py
 ```
 
 ## License
